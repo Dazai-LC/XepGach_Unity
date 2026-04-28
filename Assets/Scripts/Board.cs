@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using UnityEngine.SceneManagement;
 using TMPro; // Khai báo dùng Text UI
 
 public class Board : MonoBehaviour
@@ -6,6 +7,7 @@ public class Board : MonoBehaviour
     public int width = 10;
     public int height = 20;
     public Transform[,] grid;
+    public GameObject gameOverPanel;
 
     // Biến UI
     public int score = 0;
@@ -13,6 +15,12 @@ public class Board : MonoBehaviour
     // BIẾN MỚI CHO ĐIỂM CAO NHẤT
     public TextMeshProUGUI maxScoreText;
     private int highScore = 0;
+    //Biến Level
+    [Header("Level Settings")]
+    public int totalLinesCleared = 0;
+    public int level = 1;
+    public float currentFallSpeed = 1f; // Tốc độ rơi khởi điểm
+    public TextMeshProUGUI levelText;   // Nơi hiển thị level lên UI
 
     private bool isPaused = false;
 
@@ -22,6 +30,10 @@ public class Board : MonoBehaviour
 
         // 1. Vừa mở game: Tải Kỷ lục cũ từ bộ nhớ máy lên
         highScore = PlayerPrefs.GetInt("HighScore", 0); // 0 là điểm mặc định nếu chưa chơi bao giờ
+        if(levelText != null)
+        {
+            levelText.text.ToString();
+        }
         if (maxScoreText != null)
         {
             maxScoreText.text = highScore.ToString();
@@ -56,6 +68,7 @@ public class Board : MonoBehaviour
         for (int x = 0; x < width; x++)
         {
             Destroy(grid[x, y].gameObject);
+            AudioManager.instance.PlaySFX(AudioManager.instance.clearLineSound);
             grid[x, y] = null;
         }
     }
@@ -99,6 +112,21 @@ public class Board : MonoBehaviour
 
         if (linesCleared > 0)
         {
+            //---Logic tăng level---
+            totalLinesCleared += linesCleared;
+            //Cứ xóa được 10 dòng thì lên 1 level
+            int newLevel = (totalLinesCleared / 10) + 1;
+            if(newLevel > level)
+            {
+                level = newLevel;
+                //Công thức ép xung: Mỗi level giảm 10% thời gian rơi
+                currentFallSpeed = Mathf.Max(0.1f, 1f - ((level - 1) * 0.1f));
+                if(levelText != null)
+                {
+                    levelText.text = level.ToString();
+                    Debug.Log("Level up! Tốc độ mới: " + currentFallSpeed);
+                }
+            }
             if (linesCleared == 1) UpdateScore(100);
             else if (linesCleared == 2) UpdateScore(300);
             else if (linesCleared == 3) UpdateScore(500);
@@ -135,5 +163,26 @@ public class Board : MonoBehaviour
     {
         isPaused = !isPaused;
         Time.timeScale = isPaused ? 0f : 1f;
+    }
+    
+    public void GameOver()
+    {
+        //Bật cái bảng Game Over lên che màn hình
+        if(gameOverPanel != null)
+        {
+            gameOverPanel.SetActive(true);
+            AudioManager.instance.StopBGM();
+            AudioManager.instance.PlaySFX(AudioManager.instance.gameOverSound);
+            //Đóng băng thời gian:
+            Time.timeScale = 0f;
+        }
+    }
+
+    public void RestartGame()
+    {
+        //Quan trọng nhất: Phải rã đông thời gian trước khi load lại, nếu không game mới cũng bị đóng băng!
+        Time.timeScale = 1f;
+        //Tải lại chính cái Scene hiện tại đang chơi:
+        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 }

@@ -52,6 +52,7 @@ public class Spawner : MonoBehaviour
         GameObject pieceObj = Instantiate(data.prefab, spawnPosition, Quaternion.identity);
         Piece piece = pieceObj.GetComponent<Piece>();
         piece.board = this.board;
+        piece.stepDelay = this.board.currentFallSpeed; // ---Bơm tốc độ rơi theo level
         piece.tetrominoData = data;
         activePiece = piece;
 
@@ -61,7 +62,8 @@ public class Spawner : MonoBehaviour
         {
             Debug.Log("GAME OVER!");
             Destroy(pieceObj);
-            Time.timeScale = 0f;
+            //Gọi hàm GameOver bên Board
+            this.board.GameOver();
         }
     }
 

@@ -7,6 +7,8 @@ public class Piece : MonoBehaviour
     public float stepDelay = 1f;
     private float moveTimer;
 
+    public int rotationIndex = 0;
+
     void Update()
     {
         // 1. Logic rơi tự động theo thời gian
@@ -59,8 +61,56 @@ public class Piece : MonoBehaviour
     public void Rotate()
     {
         if (!this.enabled) return;
+
+        // 1. Lưu lại trạng thái cũ đề phòng thất bại toàn tập
+        int originalRotation = rotationIndex;
+        Vector3 originalPos = transform.position;
+
+        // 2. Xoay thử 90 độ và tăng index (0->1->2->3->0)
+        rotationIndex = (rotationIndex + 1) % 4;
         transform.eulerAngles -= new Vector3(0, 0, 90);
-        if (!board.IsValidPosition(this.transform)) transform.eulerAngles += new Vector3(0, 0, 90);
+
+        // 3. Mở sổ tay Wall Kick ra tra cứu
+        bool wallKickSuccess = TestWallKicks(rotationIndex);
+        //xoay thành công, thưởng nhạc:
+        AudioManager.instance.PlaySFX(AudioManager.instance.moveSound);
+
+        // 4. Nếu tra cả 5 phương án đều thất bại -> Bó tay, quay về như cũ!
+        if (!wallKickSuccess)
+        {
+            rotationIndex = originalRotation;
+            transform.position = originalPos;
+            transform.eulerAngles += new Vector3(0, 0, 90);
+        }
+    }
+
+    private bool TestWallKicks(int targetRotationIndex)
+    {
+        // Lấy đúng bảng Wall Kick tùy theo hình dáng gạch (O không cần xoay, I lấy bảng I, còn lại lấy chung)
+        Vector2Int[,] wallKicksData;
+        if (tetrominoData.type == TetrominoType.O) return true; // Cục vuông khỏi cần test
+        else if (tetrominoData.type == TetrominoType.I) wallKicksData = Data.WallKicksI;
+        else wallKicksData = Data.WallKicksJLOSTZ;
+
+        // Thử lần lượt 5 phương án trong bảng
+        for (int i = 0; i < 5; i++)
+        {
+            Vector2Int translation = wallKicksData[targetRotationIndex, i];
+
+            // Dịch chuyển thử
+            transform.position += new Vector3(translation.x, translation.y, 0);
+
+            // Hỏi sếp Board xem chỗ này ngon chưa?
+            if (board.IsValidPosition(this.transform))
+            {
+                return true; // Ngon! Chốt phương án này!
+            }
+
+            // Nếu không ngon, lùi lại vị trí cũ để test phương án tiếp theo
+            transform.position -= new Vector3(translation.x, translation.y, 0);
+        }
+
+        return false; // Thất bại toàn tập
     }
 
     public void HardDrop()
@@ -68,6 +118,8 @@ public class Piece : MonoBehaviour
         if (!this.enabled) return;
         while (board.IsValidPosition(this.transform)) transform.position += Vector3.down;
         transform.position += Vector3.up;
+        // khi chạm đất, thưởng nhạc:
+        AudioManager.instance.PlaySFX(AudioManager.instance.hardDropSound);
         Lock();
     }
     void Lock()
